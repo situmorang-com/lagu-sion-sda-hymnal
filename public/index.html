@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lagu Sion + SDA Hymnal</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <span class="brand-mark">LS</span>
+      <span>
+        <strong>Lagu Sion</strong>
+        <em>+ SDA Hymnal</em>
+      </span>
+    </a>
+
+    <div class="search-wrap">
+      <input id="q" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Search titles, lyrics, composer, or hymn number…"
+             aria-label="Search hymns">
+      <kbd class="slash-hint">/</kbd>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="randomBtn" class="icon-btn" title="Random hymn">Random</button>
+      <button id="themeBtn" class="icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button>
+    </div>
+  </header>
+
+  <nav class="scopebar" id="scopebar">
+    <button class="scope active" data-scope="all">Both hymnals</button>
+    <button class="scope" data-scope="ls">Lagu Sion</button>
+    <button class="scope" data-scope="sda">SDA Hymnal</button>
+    <span class="scope-stats" id="stats"></span>
+  </nav>
+
+  <main id="main">
+    <section id="home" class="view">
+      <div class="hero">
+        <h1>Two hymnals, cross-referenced</h1>
+        <p id="heroStats">Loading…</p>
+        <div class="hero-hints">
+          <span>Type a <b>number</b> to jump to a hymn</span>
+          <span>Press <kbd>/</kbd> to search</span>
+          <span>Press <kbd>Esc</kbd> to clear</span>
+        </div>
+      </div>
+      <div class="browse-head">
+        <h2>Browse</h2>
+        <div class="seg" id="browseSeg">
+          <button class="active" data-book="ls">Lagu Sion</button>
+          <button data-book="sda">SDA Hymnal</button>
+        </div>
+        <label class="check"><input type="checkbox" id="onlyPaired"> Only cross-referenced</label>
+      </div>
+      <div id="browseList" class="cardlist"></div>
+    </section>
+
+    <section id="results" class="view hidden">
+      <div class="results-head">
+        <span id="resultsCount"></span>
+      </div>
+      <div id="resultsList" class="cardlist"></div>
+    </section>
+
+    <section id="detail" class="view hidden"></section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

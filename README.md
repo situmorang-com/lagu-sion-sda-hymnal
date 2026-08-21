@@ -9,7 +9,8 @@ A comprehensive scraper and search tool for Indonesian Lagu Sion hymnal songs wi
 - 📖 Maps each song to its **SDA Hymnal**, **LS Edisi Lama**, and **LS Toba Lama** equivalents (number + title)
 - 💾 Stores data in both JSON and SQLite for easy searching
 - 🔍 Full-text search across lyrics, titles, composers, and hymnal numbers
-- 🌐 Web interface with **Search** and **Browse All Songs** tabs
+- 🌐 Web app with **bilingual side-by-side reading** — Indonesian and English verses in parallel
+- 📇 English title index transcribed from the printed hymnal (pp. 561–567), reconciled against the DB
 - ⚡ Fast — uses the site's own JSON + correlation API (no headless browser needed)
 
 ## 🔧 How It Works
@@ -56,16 +57,26 @@ node search.js "puji"           # Search by lyrics
 
 Each result shows the song's SDA Hymnal, Edisi Lama, and Toba Lama equivalents.
 
-### Option 2: Web Interface (Most User-Friendly)
+### Option 2: Web App (Most User-Friendly)
 ```bash
+npm install   # first time only
 npm start
 ```
 
-Then open **http://localhost:3000**. The interface has two tabs:
+Then open **http://localhost:3000**.
 
-- **🔍 Search** — real-time search as you type, with hymnal mappings highlighted.
-- **📚 Browse All Songs** — the complete list of all 525 songs, with a filter box and an
-  "only show songs with an SDA Hymnal match" checkbox. Each song has a *Show lyrics* toggle.
+- **Unified search** across *both* hymnals — 525 Indonesian songs and 695 English hymns.
+  Results are ranked: an exact hymn number beats a title hit, which beats a lyrics hit.
+  Filter to one book with the **Both hymnals / Lagu Sion / SDA Hymnal** buttons.
+- **Bilingual reading view** — for the 394 cross-referenced songs the Indonesian and English
+  verses sit side by side, split verse by verse. Where the two books have a different number
+  of verses the view says so, rather than implying a line-by-line translation.
+- **Browse** either hymnal, optionally limited to cross-referenced songs.
+- **Deep links** — `#/ls/35` and `#/sda/545` address a hymn directly, so pages are shareable
+  and the back button works.
+- Light/dark theme, mobile layout, and a print stylesheet that drops the chrome.
+
+Keyboard: <kbd>/</kbd> focuses search, <kbd>Esc</kbd> clears it.
 
 ### Option 3: JSON Direct Access
 ```bash
@@ -158,23 +169,31 @@ db.all('SELECT * FROM songs WHERE title LIKE ?', ['%tuhan%'],
 
 ### Query the API (when server is running)
 ```bash
-# Search
-curl "http://localhost:3000/api/search?q=tuhan"
+# Ranked search across both hymnals; scope = all | ls | sda
+curl "http://localhost:3000/api/search?q=tuhan&scope=all"
 
-# Get all songs
+# Lightweight lists (no lyrics in the payload)
 curl "http://localhost:3000/api/songs"
+curl "http://localhost:3000/api/sda"
 
-# Get specific song
-curl "http://localhost:3000/api/songs/1"
+# A hymn with its counterpart and verse-by-verse pairing
+curl "http://localhost:3000/api/songs/35"   # by Lagu Sion number
+curl "http://localhost:3000/api/sda/545"    # by SDA Hymnal number
+
+# Corpus counts, and a random pick
+curl "http://localhost:3000/api/stats"
+curl "http://localhost:3000/api/random"
 ```
 
 ## 📝 Notes
 
-- The scraper uses **Puppeteer** to handle JavaScript-rendered content
-- First run takes 5-10 minutes as it navigates through all songs
-- Subsequent searches are instant (data is cached)
-- The web server uses **Express.js** for the REST API
-- All data is stored locally, no external dependencies needed for searching
+- The scraper uses the site's own JSON endpoints — no headless browser needed
+- The web server is **Express.js** over a single read-only SQLite connection
+- The UI lives in `public/` (plain HTML/CSS/JS, no build step)
+- All data is stored locally
+- **Lyrics are gitignored.** Only titles, hymn numbers and mappings are tracked, since the
+  hymnal texts and Indonesian translations are under copyright. Run the scraper to build
+  `lagu_sion.db` locally.
 
 ## 🔒 License
 
