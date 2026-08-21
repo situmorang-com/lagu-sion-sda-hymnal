@@ -31,6 +31,7 @@
   </header>
 
   <nav class="scopebar" id="scopebar">
+    <span class="scope-label">Show</span>
     <button class="scope active" data-scope="all">Both hymnals</button>
     <button class="scope" data-scope="ls">Lagu Sion</button>
     <button class="scope" data-scope="sda">SDA Hymnal</button>
@@ -49,11 +50,7 @@
         </div>
       </div>
       <div class="browse-head">
-        <h2>Browse</h2>
-        <div class="seg" id="browseSeg">
-          <button class="active" data-book="ls">Lagu Sion</button>
-          <button data-book="sda">SDA Hymnal</button>
-        </div>
+        <h2 id="browseHeading">Browse</h2>
         <label class="check"><input type="checkbox" id="onlyPaired"> Only cross-referenced</label>
       </div>
       <div id="browseList" class="cardlist"></div>

@@ -133,12 +133,19 @@ body {
 /* --------------------------------------------------------------- scopebar */
 
 .scopebar {
-  position: sticky; top: 57px; z-index: 19;
+  /* --topbar-h is measured at runtime; a hard-coded offset let the topbar and
+     this bar overlap by a few pixels once fonts settled. */
+  position: sticky; top: var(--topbar-h, 57px); z-index: 19;
   display: flex; align-items: center; gap: 4px;
   padding: 9px 28px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
   border-bottom: 1px solid var(--line-soft);
+}
+.scope-label {
+  font: 500 10.5px/1 var(--sans);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--faint);
+  margin-right: 6px;
 }
 .scope {
   font: 13px var(--sans); color: var(--muted);
@@ -254,11 +261,26 @@ kbd {
   margin-top: 7px; font-size: 12px; color: var(--faint);
 }
 .pair-chip {
-  font: 500 11px/1 var(--sans); letter-spacing: .04em;
-  color: var(--sda); background: var(--sda-soft);
+  font: 500 11px/1.35 var(--sans); letter-spacing: .04em;
   padding: 3px 8px; border-radius: 999px;
   font-variant-numeric: tabular-nums;
+  max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.pair-chip.sda { color: var(--sda); background: var(--sda-soft); }
+.pair-chip.ls  { color: var(--ls);  background: var(--ls-soft); }
+
+/* Section label when both books share the index. Not sticky: .cardlist clips
+   with overflow:hidden for its rounded corners, which disables sticky inside. */
+.group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 22px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+  font: 500 10.5px/1 var(--sans);
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.group-head:first-child { border-top: 0; }
+.group-count { font-variant-numeric: tabular-nums; color: var(--faint); letter-spacing: .04em; }
 
 .empty { padding: 72px 24px; text-align: center; color: var(--muted); font-size: 14px; }
 .spinner {
@@ -374,6 +396,8 @@ kbd {
 
   .card { grid-template-columns: 1fr; gap: 3px; padding: 14px 18px; }
   .cols-head { display: none; }
+  .group-head { padding: 12px 18px; }
+  .pair-chip { max-width: 100%; }
 
   .verse { grid-template-columns: 1fr; gap: 10px; padding: 20px 0; }
   .verse-n {

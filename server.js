@@ -44,7 +44,19 @@ const route = handler => (req, res) =>
 const LS_LIST_COLS = `number, title, english_title, composer, arranger,
   sda_hymnal_num, sda_hymnal_title, old_edition_num, old_edition_title,
   toba_edition_num, toba_edition_title`;
-const SDA_LIST_COLS = `number, title, first_line, composer, arranger, verse_count`;
+/*
+ * The SDA list carries its Lagu Sion counterpart so the cross-reference reads
+ * the same way in both directions. Five hymnal numbers are claimed by two
+ * Lagu Sion songs apiece (e.g. LS 130 and LS 281 both map to SDA 154), so the
+ * rows are grouped to keep one line per hymn; min() fixes which counterpart is
+ * shown and ls_count tells the UI another exists. Grouping by h.number also
+ * relies on SQLite resolving the bare h.* columns from the matching row.
+ */
+const SDA_LIST_COLS = `h.number, h.title, h.first_line, h.composer, h.arranger,
+  h.verse_count, min(s.number) as ls_num, s.title as ls_title,
+  count(s.number) as ls_count`;
+const SDA_FROM = `sda_songs h left join songs s on s.sda_hymnal_num = h.number`;
+const SDA_GROUP = `group by h.number`;
 
 /*
  * Hymn text arrives as prose. Two clean-ups make it readable as verse:
@@ -137,21 +149,23 @@ app.get('/api/search', route(async (req, res) => {
     const rows = await all(
       `select ${SDA_LIST_COLS},
               case
-                when number = ?1 then 0
-                when title like ?3 collate nocase then 2
-                when first_line like ?3 collate nocase then 3
-                when title like ?2 collate nocase then 4
-                when first_line like ?2 collate nocase then 5
-                when composer like ?2 collate nocase then 7
+                when h.number = ?1 then 0
+                when h.title like ?3 collate nocase then 2
+                when h.first_line like ?3 collate nocase then 3
+                when h.title like ?2 collate nocase then 4
+                when h.first_line like ?2 collate nocase then 5
+                when h.composer like ?2 collate nocase then 7
                 else 8
               end rank
-       from sda_songs
-       where number = ?1
-          or title like ?2 collate nocase
-          or first_line like ?2 collate nocase
-          or composer like ?2 collate nocase
-          or lyrics like ?2 collate nocase
-       order by rank, number
+       from ${SDA_FROM}
+       where h.number = ?1
+          or h.title like ?2 collate nocase
+          or h.first_line like ?2 collate nocase
+          or h.composer like ?2 collate nocase
+          or h.lyrics like ?2 collate nocase
+          or s.title like ?2 collate nocase
+       ${SDA_GROUP}
+       order by rank, h.number
        limit ?4`,
       [asNum, like, starts, limit]
     );
@@ -169,7 +183,9 @@ app.get('/api/songs', route(async (req, res) => {
 }));
 
 app.get('/api/sda', route(async (req, res) => {
-  res.json({ songs: await all(`select ${SDA_LIST_COLS} from sda_songs order by number`) });
+  res.json({
+    songs: await all(`select ${SDA_LIST_COLS} from ${SDA_FROM} ${SDA_GROUP} order by h.number`)
+  });
 }));
 
 // ---------------------------------------------------------------- detail

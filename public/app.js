@@ -12,19 +12,29 @@ const els = {
   resultsCount: $('#resultsCount'),
   detail: $('#detail'),
   browseList: $('#browseList'),
-  browseSeg: $('#browseSeg'),
+  browseHeading: $('#browseHeading'),
   onlyPaired: $('#onlyPaired'),
   scopebar: $('#scopebar'),
   themeBtn: $('#themeBtn'),
   randomBtn: $('#randomBtn')
 };
 
+// One scope drives both the search and the index below it.
 const state = {
   scope: 'all',
-  book: 'ls',
   lists: { ls: null, sda: null },
   searchSeq: 0
 };
+
+const BOOKS = {
+  ls:  { label: 'Lagu Sion',  full: 'Lagu Sion (Edisi Baru)' },
+  sda: { label: 'SDA Hymnal', full: 'SDA Hymnal' }
+};
+
+const booksInScope = () => (state.scope === 'all' ? ['ls', 'sda'] : [state.scope]);
+
+/** Does this row have a counterpart in the other book? */
+const isPaired = row => (row.kind === 'ls' ? row.sda_hymnal_num : row.ls_num);
 
 /* ------------------------------------------------------------------ util */
 
@@ -57,7 +67,7 @@ function empty(container, message) {
 /* ----------------------------------------------------------------- cards */
 
 function card(item) {
-  const isLs = item.kind === 'sda' ? false : item.kind === 'ls' ? true : state.book === 'ls';
+  const isLs = item.kind !== 'sda';
   const node = el('button', 'card');
   node.type = 'button';
 
@@ -73,11 +83,17 @@ function card(item) {
 
   const meta = el('div', 'card-meta');
   if (item.composer) meta.append(el('span', null, item.composer));
-  if (isLs && item.sda_hymnal_num) {
-    meta.append(el('span', 'pair-chip', `SDA ${item.sda_hymnal_num}`));
-  }
   if (!isLs && item.verse_count) {
     meta.append(el('span', null, `${item.verse_count} verse${item.verse_count > 1 ? 's' : ''}`));
+  }
+  // The cross-reference reads both ways: LS rows point at the hymnal, and
+  // hymnal rows point back at Lagu Sion.
+  if (isLs && item.sda_hymnal_num) {
+    meta.append(el('span', 'pair-chip sda', `SDA ${item.sda_hymnal_num}`));
+  }
+  if (!isLs && item.ls_num) {
+    const extra = item.ls_count > 1 ? ` +${item.ls_count - 1}` : '';
+    meta.append(el('span', 'pair-chip ls', `LS ${item.ls_num} · ${item.ls_title}${extra}`));
   }
   if (meta.childElementCount) body.append(meta);
 
@@ -131,20 +147,43 @@ function runSearch(q) {
 /* ---------------------------------------------------------------- browse */
 
 function loadBrowse() {
-  const book = state.book;
-  if (state.lists[book]) return renderBrowse();
+  const missing = booksInScope().filter(b => !state.lists[b]);
+  if (!missing.length) return renderBrowse();
   spinner(els.browseList);
-  api(book === 'ls' ? '/api/songs' : '/api/sda')
-    .then(data => { state.lists[book] = data.songs; renderBrowse(); })
+  Promise.all(missing.map(book =>
+    api(book === 'ls' ? '/api/songs' : '/api/sda')
+      .then(data => { state.lists[book] = data.songs.map(s => ({ ...s, kind: book })); })))
+    .then(renderBrowse)
     .catch(err => empty(els.browseList, `Could not load list: ${err.message}`));
 }
 
 function renderBrowse() {
-  let list = state.lists[state.book] || [];
-  if (state.book === 'ls' && els.onlyPaired.checked) {
-    list = list.filter(s => s.sda_hymnal_num);
+  const books = booksInScope();
+  const onlyPaired = els.onlyPaired.checked;
+  const groups = books.map(book => {
+    const rows = state.lists[book] || [];
+    return { book, rows: onlyPaired ? rows.filter(isPaired) : rows };
+  });
+
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  els.browseHeading.textContent = onlyPaired
+    ? `Browse · ${total} cross-referenced`
+    : `Browse · ${total}`;
+
+  if (!total) return empty(els.browseList, 'Nothing to show');
+
+  const frag = document.createDocumentFragment();
+  for (const g of groups) {
+    // Only label the sections when both books are on screen at once.
+    if (groups.length > 1) {
+      const head = el('div', 'group-head');
+      head.append(el('span', null, BOOKS[g.book].full));
+      head.append(el('span', 'group-count', String(g.rows.length)));
+      frag.append(head);
+    }
+    for (const item of g.rows) frag.append(card(item));
   }
-  renderCards(els.browseList, list, 'Nothing to show');
+  els.browseList.replaceChildren(frag);
 }
 
 /* ---------------------------------------------------------------- detail */
@@ -292,16 +331,9 @@ els.scopebar.addEventListener('click', e => {
   if (!btn) return;
   els.scopebar.querySelectorAll('.scope').forEach(b => b.classList.toggle('active', b === btn));
   state.scope = btn.dataset.scope;
-  if (els.q.value.trim()) runSearch(els.q.value.trim());
-});
-
-els.browseSeg.addEventListener('click', e => {
-  const btn = e.target.closest('button');
-  if (!btn) return;
-  els.browseSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
-  state.book = btn.dataset.book;
-  els.onlyPaired.parentElement.style.visibility = state.book === 'ls' ? 'visible' : 'hidden';
+  // The scope governs the index as well as the search, so both follow it.
   loadBrowse();
+  if (els.q.value.trim()) runSearch(els.q.value.trim());
 });
 
 els.onlyPaired.addEventListener('change', renderBrowse);
@@ -326,6 +358,14 @@ document.addEventListener('keydown', e => {
 });
 
 window.addEventListener('hashchange', router);
+
+// Publish the topbar's real height so the scope bar can stick flush beneath it.
+const syncTopbarHeight = () => {
+  const bar = document.querySelector('.topbar');
+  document.documentElement.style.setProperty('--topbar-h', `${Math.round(bar.getBoundingClientRect().height)}px`);
+};
+syncTopbarHeight();
+addEventListener('resize', syncTopbarHeight);
 
 api('/api/stats')
   .then(s => {
