@@ -46,14 +46,33 @@ const LS_LIST_COLS = `number, title, english_title, composer, arranger,
   toba_edition_num, toba_edition_title`;
 const SDA_LIST_COLS = `number, title, first_line, composer, arranger, verse_count`;
 
+/*
+ * Hymn text arrives as prose. Two clean-ups make it readable as verse:
+ *   - nearly every Lagu Sion block opens with a literal "Verse 3:" label, which
+ *     would duplicate the verse number the UI already prints in the margin;
+ *   - both books join poetic lines with "; " rather than a newline.
+ * Neither touches the database — this is presentation only.
+ */
+const LABEL_RE = /^\s*(verse|bait|ref+rain|ref+|chorus|koor)\s*(\d+)?\s*[:.]\s*/i;
+
+function poeticLines(text) {
+  return String(text || '').replace(/;\s+/g, ';\n').trim();
+}
+
 /** Split a Lagu Sion lyric blob into verse blocks on blank lines. */
 function splitBlocks(lyrics) {
   return String(lyrics || '')
     .replace(/\r\n/g, '\n')
     .trim()
     .split(/\n\s*\n/)
-    .map(b => b.trim())
-    .filter(Boolean);
+    .map(raw => {
+      const block = raw.trim();
+      if (!block) return null;
+      const m = block.match(LABEL_RE);
+      const kind = m && /ref|chorus|koor/i.test(m[1]) ? 'refrain' : 'verse';
+      return { kind, text: poeticLines(block.replace(LABEL_RE, '')) };
+    })
+    .filter(b => b && b.text);
 }
 
 // ---------------------------------------------------------------- stats
@@ -158,32 +177,37 @@ app.get('/api/sda', route(async (req, res) => {
 /** Build the bilingual payload shared by both detail endpoints. */
 async function buildPair(lsRow, sdaRow) {
   const blocks = lsRow ? splitBlocks(lsRow.lyrics) : [];
-  const verses = sdaRow
+  const lsVerses = blocks.filter(b => b.kind === 'verse');
+  const lsRefrain = blocks.find(b => b.kind === 'refrain')?.text || null;
+
+  const sdaVerses = sdaRow
     ? await all(
         `select seq, verse_label, lyrics from sda_verses where sda_number = ? order by seq`,
         [sdaRow.number])
     : [];
 
   const rows = [];
-  const n = Math.max(blocks.length, verses.length);
+  const n = Math.max(lsVerses.length, sdaVerses.length);
   for (let i = 0; i < n; i++) {
     rows.push({
-      label: verses[i]?.verse_label || String(i + 1),
-      id: blocks[i] || null,
-      en: verses[i]?.lyrics || null
+      label: sdaVerses[i]?.verse_label || String(i + 1),
+      id: lsVerses[i]?.text || null,
+      en: sdaVerses[i] ? poeticLines(sdaVerses[i].lyrics) : null
     });
   }
+
+  const sdaChorus = sdaRow?.chorus ? poeticLines(sdaRow.chorus) : null;
 
   return {
     ls: lsRow || null,
     sda: sdaRow || null,
     verses: rows,
-    chorus: sdaRow?.chorus || null,
+    refrain: lsRefrain || sdaChorus ? { id: lsRefrain, en: sdaChorus } : null,
     // Positional pairing only — flag it so the UI can warn rather than imply
     // the two columns are a verified line-by-line translation.
-    aligned: Boolean(lsRow && sdaRow) && blocks.length === verses.length,
-    lsBlocks: blocks.length,
-    sdaVerses: verses.length
+    aligned: Boolean(lsRow && sdaRow) && lsVerses.length === sdaVerses.length,
+    lsBlocks: lsVerses.length,
+    sdaVerses: sdaVerses.length
   };
 }
 

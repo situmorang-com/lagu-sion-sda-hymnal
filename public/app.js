@@ -61,7 +61,9 @@ function card(item) {
   const node = el('button', 'card');
   node.type = 'button';
 
-  node.append(el('span', `num ${isLs ? 'ls' : 'sda'}`, `${isLs ? 'LS' : 'SDA'} ${item.number}`));
+  const num = el('span', `num ${isLs ? 'ls' : 'sda'}`, isLs ? 'LS ' : 'SDA ');
+  num.append(el('b', null, String(item.number)));
+  node.append(num);
 
   const body = el('div', 'card-body');
   body.append(el('div', 'card-title', item.title || 'Untitled'));
@@ -164,9 +166,17 @@ function verseRow(label, indonesian, english, bilingual) {
 }
 
 function renderDetail(data) {
-  const { ls, sda, verses, chorus, aligned, lsBlocks, sdaVerses } = data;
+  const { ls, sda, verses, refrain, aligned, lsBlocks, sdaVerses } = data;
   const bilingual = Boolean(ls && sda);
   const primary = ls || sda;
+
+  // A server still running pre-rebuild code answers with a bare song row and
+  // no ls/sda keys. Say so plainly instead of throwing on primary.title.
+  if (!primary) {
+    empty(els.detail,
+      'This looks like an older server process — restart it (npm start) to pick up the current code.');
+    return;
+  }
 
   const wrap = document.createDocumentFragment();
 
@@ -229,8 +239,8 @@ function renderDetail(data) {
     }
   }
 
-  if (chorus) {
-    const row = verseRow('Refrain', ls ? null : chorus, chorus, bilingual);
+  if (refrain && (refrain.id || refrain.en)) {
+    const row = verseRow('Refrain', ls ? refrain.id : refrain.en, refrain.en, bilingual);
     row.classList.add('chorus');
     sheet.append(row);
   }
