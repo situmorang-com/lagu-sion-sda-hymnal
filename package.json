@@ -1,0 +1,24 @@
+{
+  "name": "lagu-sion-scraper",
+  "version": "1.0.0",
+  "description": "Scraper for Lagu Sion songs with SDA Hymnal equivalents",
+  "main": "scraper.js",
+  "scripts": {
+    "scrape": "node scraper-with-mappings.js",
+    "scrape:fast": "node scraper-direct.js",
+    "search": "node search.js",
+    "server": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "lagu-sion",
+    "hymnal",
+    "sda"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+.env
+.DS_Store
+*.log
+dist/
+build/
+
+# Data artifacts: full lyrics live here, keep them local
+*.db
+*.db.bak*
+*.bak
+*.json
+!package.json
+!package-lock.json
