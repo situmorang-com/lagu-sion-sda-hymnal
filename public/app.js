@@ -78,8 +78,11 @@ function card(item) {
   const body = el('div', 'card-body');
   body.append(el('div', 'card-title', item.title || 'Untitled'));
 
-  const sub = isLs ? item.english_title : item.first_line;
-  if (sub) body.append(el('div', 'card-sub', sub));
+  // On the hymnal side first_line is the opening line of the preview, so the
+  // preview replaces it rather than repeating it.
+  if (isLs && item.english_title) body.append(el('div', 'card-sub', item.english_title));
+  const opening = item.preview || (!isLs ? item.first_line : null);
+  if (opening) body.append(el('div', 'card-preview', opening));
 
   const meta = el('div', 'card-meta');
   if (item.composer) meta.append(el('span', null, item.composer));

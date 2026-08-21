@@ -39,11 +39,12 @@ const route = handler => (req, res) =>
     res.status(500).json({ error: err.message });
   });
 
-// Columns worth sending for a list; lyrics are deliberately excluded so the
-// browse payload stays small.
+// Columns worth sending for a list. The lyric column is selected only to derive
+// the short preview below; withPreview() strips it before the rows go out, so
+// the payload never carries a full text.
 const LS_LIST_COLS = `number, title, english_title, composer, arranger,
   sda_hymnal_num, sda_hymnal_title, old_edition_num, old_edition_title,
-  toba_edition_num, toba_edition_title`;
+  toba_edition_num, toba_edition_title, lyrics`;
 /*
  * The SDA list carries its Lagu Sion counterpart so the cross-reference reads
  * the same way in both directions. Five hymnal numbers are claimed by two
@@ -54,7 +55,9 @@ const LS_LIST_COLS = `number, title, english_title, composer, arranger,
  */
 const SDA_LIST_COLS = `h.number, h.title, h.first_line, h.composer, h.arranger,
   h.verse_count, min(s.number) as ls_num, s.title as ls_title,
-  count(s.number) as ls_count`;
+  count(s.number) as ls_count,
+  (select v.lyrics from sda_verses v
+    where v.sda_number = h.number order by v.seq limit 1) as v1`;
 const SDA_FROM = `sda_songs h left join songs s on s.sda_hymnal_num = h.number`;
 const SDA_GROUP = `group by h.number`;
 
@@ -69,6 +72,21 @@ const LABEL_RE = /^\s*(verse|bait|ref+rain|ref+|chorus|koor)\s*(\d+)?\s*[:.]\s*/
 
 function poeticLines(text) {
   return String(text || '').replace(/;\s+/g, ';\n').trim();
+}
+
+/*
+ * The opening lines of the first stanza, used to identify a hymn in the index.
+ * Lists send this instead of the full text, so the payload stays small.
+ */
+function previewOf(text, lines = 2) {
+  const first = splitBlocks(text)[0];
+  const body = first ? first.text : poeticLines(text);
+  return body.split('\n').slice(0, lines).join('\n').trim() || null;
+}
+
+/** Swap a row's raw lyric column for a short preview. */
+function withPreview(rows, column) {
+  return rows.map(({ [column]: text, ...row }) => ({ ...row, preview: previewOf(text) }));
 }
 
 /** Split a Lagu Sion lyric blob into verse blocks on blank lines. */
@@ -142,7 +160,7 @@ app.get('/api/search', route(async (req, res) => {
        limit ?4`,
       [asNum, like, starts, limit]
     );
-    for (const r of rows) results.push({ kind: 'ls', ...r });
+    for (const r of withPreview(rows, 'lyrics')) results.push({ kind: 'ls', ...r });
   }
 
   if (scope === 'all' || scope === 'sda') {
@@ -169,7 +187,7 @@ app.get('/api/search', route(async (req, res) => {
        limit ?4`,
       [asNum, like, starts, limit]
     );
-    for (const r of rows) results.push({ kind: 'sda', ...r });
+    for (const r of withPreview(rows, 'v1')) results.push({ kind: 'sda', ...r });
   }
 
   results.sort((a, b) => a.rank - b.rank || a.number - b.number);
@@ -179,12 +197,14 @@ app.get('/api/search', route(async (req, res) => {
 // ---------------------------------------------------------------- lists
 
 app.get('/api/songs', route(async (req, res) => {
-  res.json({ songs: await all(`select ${LS_LIST_COLS} from songs order by number`) });
+  const rows = await all(`select ${LS_LIST_COLS} from songs order by number`);
+  res.json({ songs: withPreview(rows, 'lyrics') });
 }));
 
 app.get('/api/sda', route(async (req, res) => {
   res.json({
-    songs: await all(`select ${SDA_LIST_COLS} from ${SDA_FROM} ${SDA_GROUP} order by h.number`)
+    songs: withPreview(
+      await all(`select ${SDA_LIST_COLS} from ${SDA_FROM} ${SDA_GROUP} order by h.number`), 'v1')
   });
 }));
 
